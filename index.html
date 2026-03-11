@@ -17,11 +17,20 @@
         #panzoom-container {
             width: 100vw;
             height: 100vh;
+            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
-            /* CRUCIAL: Bloquea el scroll nativo para que el pellizco funcione */
+        }
+
+        /* Envolvemos la imagen en un div que ocupa el 100% de la pantalla */
+        #panzoom-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* CRUCIAL: Bloquea gestos nativos para que Panzoom tome el control */
             touch-action: none; 
             cursor: grab;
         }
@@ -32,55 +41,41 @@
             max-height: 100%;
             object-fit: contain;
             image-rendering: -webkit-optimize-contrast;
-            /* Evita que el móvil intente "seleccionar" o "arrastrar" la imagen */
+            /* Evita que el navegador intente arrastrar la imagen como archivo */
             user-select: none;
             -webkit-user-drag: none;
-            pointer-events: none; /* Los eventos los capturará el contenedor */
         }
     </style>
 </head>
 <body>
 
     <div id="panzoom-container">
-        <img id="panzoom-element" src="image_0.png" alt="Menú de Bebidas">
+        <div id="panzoom-wrapper">
+            <img id="panzoom-element" src="image_0.png" alt="Menú de Bebidas">
+        </div>
     </div>
 
     <script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
 
     <script>
-        const elem = document.getElementById('panzoom-element');
-        const container = document.getElementById('panzoom-container');
+        const wrapper = document.getElementById('panzoom-wrapper');
 
-        function iniciarMenu() {
-            const panzoom = Panzoom(elem, {
-                maxScale: 12,      // Zoom potente solicitado
-                minScale: 1,
-                initialScale: 1,
-                contain: 'inside', // Mantiene la imagen visible sin cortes
-                noBind: true       // Manejaremos los eventos manualmente para máxima compatibilidad
-            });
+        // Inicializamos Panzoom en el WRAPPER
+        const panzoom = Panzoom(wrapper, {
+            maxScale: 15,       // Zoom muy potente solicitado
+            minScale: 1,        // No permite que la imagen se vea más pequeña que la pantalla
+            initialScale: 1,
+            contain: 'inside',  // ESTABILIDAD: Evita que la imagen se desplace fuera de los bordes
+            cursor: 'grab'
+        });
 
-            // ZOOM PC (Rueda del ratón)
-            container.addEventListener('wheel', panzoom.zoomWithWheel);
+        // Zoom con la rueda del ratón (PC)
+        wrapper.addEventListener('wheel', panzoom.zoomWithWheel);
 
-            // ZOOM MÓVIL (Pellizco y arrastre)
-            // Vinculamos los toques del contenedor directamente a la librería
-            container.addEventListener('pointerdown', panzoom.handleDown);
-            container.addEventListener('pointermove', panzoom.handleMove);
-            container.addEventListener('pointerup', panzoom.handleUp);
-
-            // DOBLE CLIC / TOQUE para resetear
-            container.addEventListener('dblclick', () => {
-                panzoom.reset({ animate: true });
-            });
-        }
-
-        // Ejecutar cuando la imagen esté cargada
-        if (elem.complete) {
-            iniciarMenu();
-        } else {
-            elem.addEventListener('load', iniciarMenu);
-        }
+        // Resetear con doble clic o doble toque
+        wrapper.addEventListener('dblclick', () => {
+            panzoom.reset({ animate: true });
+        });
     </script>
 
 </body>
