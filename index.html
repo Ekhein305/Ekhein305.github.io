@@ -21,19 +21,21 @@
             justify-content: center;
             align-items: center;
             overflow: hidden;
-            /* CRUCIAL: Esto permite que el contenedor capture los toques en el móvil */
+            /* CRUCIAL: Bloquea el scroll nativo para que el pellizco funcione */
             touch-action: none; 
             cursor: grab;
         }
 
         #panzoom-element {
+            display: block;
             max-width: 100%;
             max-height: 100%;
-            display: block;
+            object-fit: contain;
             image-rendering: -webkit-optimize-contrast;
-            /* Evita que el navegador intente arrastrar la imagen como un archivo */
+            /* Evita que el móvil intente "seleccionar" o "arrastrar" la imagen */
             user-select: none;
             -webkit-user-drag: none;
+            pointer-events: none; /* Los eventos los capturará el contenedor */
         }
     </style>
 </head>
@@ -49,36 +51,35 @@
         const elem = document.getElementById('panzoom-element');
         const container = document.getElementById('panzoom-container');
 
-        // Función para iniciar el zoom una vez que la imagen esté lista
-        function initPanzoom() {
+        function iniciarMenu() {
             const panzoom = Panzoom(elem, {
-                maxScale: 12,       // Zoom máximo
-                minScale: 1,        // Zoom mínimo
+                maxScale: 12,      // Zoom potente solicitado
+                minScale: 1,
                 initialScale: 1,
-                contain: 'inside',  // Evita que la imagen se pierda fuera de los bordes
-                noBind: true,       // Nosotros manejaremos los eventos manualmente para mayor precisión
+                contain: 'inside', // Mantiene la imagen visible sin cortes
+                noBind: true       // Manejaremos los eventos manualmente para máxima compatibilidad
             });
 
-            // 1. Zoom con la rueda del ratón (PC)
+            // ZOOM PC (Rueda del ratón)
             container.addEventListener('wheel', panzoom.zoomWithWheel);
 
-            // 2. Soporte para gestos táctiles y arrastre (Móvil y PC)
-            // Vinculamos los eventos del contenedor directamente a Panzoom
+            // ZOOM MÓVIL (Pellizco y arrastre)
+            // Vinculamos los toques del contenedor directamente a la librería
             container.addEventListener('pointerdown', panzoom.handleDown);
             container.addEventListener('pointermove', panzoom.handleMove);
             container.addEventListener('pointerup', panzoom.handleUp);
 
-            // 3. Doble clic para resetear
+            // DOBLE CLIC / TOQUE para resetear
             container.addEventListener('dblclick', () => {
-                panzoom.reset();
+                panzoom.reset({ animate: true });
             });
         }
 
-        // Ejecutamos la función: si la imagen ya cargó, inicia; si no, espera al evento 'load'
+        // Ejecutar cuando la imagen esté cargada
         if (elem.complete) {
-            initPanzoom();
+            iniciarMenu();
         } else {
-            elem.addEventListener('load', initPanzoom);
+            elem.addEventListener('load', iniciarMenu);
         }
     </script>
 
