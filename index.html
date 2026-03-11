@@ -17,23 +17,21 @@
         #panzoom-container {
             width: 100vw;
             height: 100vh;
-            /* Eliminamos el flex-centering que causa el recorte */
-            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             overflow: hidden;
-            display: block;
+            /* CRUCIAL: Esto permite que el contenedor capture los toques en el móvil */
+            touch-action: none; 
+            cursor: grab;
         }
 
         #panzoom-element {
-            /* Dejamos que la imagen use su tamaño natural, Panzoom la escalará */
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            /* Ajusta la imagen para que se vea completa sin deformarse */
-            object-fit: contain; 
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
             image-rendering: -webkit-optimize-contrast;
-            touch-action: none; 
+            /* Evita que el navegador intente arrastrar la imagen como un archivo */
             user-select: none;
             -webkit-user-drag: none;
         }
@@ -49,29 +47,39 @@
 
     <script>
         const elem = document.getElementById('panzoom-element');
-        
-        const panzoom = Panzoom(elem, {
-            maxScale: 12,       // Súper Zoom
-            minScale: 1,        // No permite que se vea más pequeña que la pantalla
-            initialScale: 1,
-            contain: null,  // 'inside' es vital para que NO se corte en móviles al cargar
-            cursor: 'grab'
-        });
-
         const container = document.getElementById('panzoom-container');
 
-        // Zoom con rueda (PC)
-        container.addEventListener('wheel', panzoom.zoomWithWheel);
+        // Función para iniciar el zoom una vez que la imagen esté lista
+        function initPanzoom() {
+            const panzoom = Panzoom(elem, {
+                maxScale: 12,       // Zoom máximo
+                minScale: 1,        // Zoom mínimo
+                initialScale: 1,
+                contain: 'inside',  // Evita que la imagen se pierda fuera de los bordes
+                noBind: true,       // Nosotros manejaremos los eventos manualmente para mayor precisión
+            });
 
-        // Forzar a que la imagen esté centrada y visible al inicio
-        setTimeout(() => {
-            panzoom.pan(0, 0); // Asegura que empiece en la esquina superior izquierda
-        }, 10);
+            // 1. Zoom con la rueda del ratón (PC)
+            container.addEventListener('wheel', panzoom.zoomWithWheel);
 
-        // Doble clic para resetear si se pierden
-        container.addEventListener('dblclick', () => {
-            panzoom.reset();
-        });
+            // 2. Soporte para gestos táctiles y arrastre (Móvil y PC)
+            // Vinculamos los eventos del contenedor directamente a Panzoom
+            container.addEventListener('pointerdown', panzoom.handleDown);
+            container.addEventListener('pointermove', panzoom.handleMove);
+            container.addEventListener('pointerup', panzoom.handleUp);
+
+            // 3. Doble clic para resetear
+            container.addEventListener('dblclick', () => {
+                panzoom.reset();
+            });
+        }
+
+        // Ejecutamos la función: si la imagen ya cargó, inicia; si no, espera al evento 'load'
+        if (elem.complete) {
+            initPanzoom();
+        } else {
+            elem.addEventListener('load', initPanzoom);
+        }
     </script>
 
 </body>
