@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Baticueva</title>
     <link rel="icon" href="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23f0c13e'%3E%3Cpath d='M50 82.5c-1.1 0-2.2-.1-3.3-.3-8.8-1.5-16.7-5.5-23.4-11.8C15 62.4 8.6 54.3 4.2 46.2.2 38.6-.2 32.1.2 26.6c.3-4.5 2.1-7.8 5.1-9.9 2.1-1.4 4.8-1.9 7.8-1.6 4.7.5 9.4 3 13 7.3 3.6 4.3 6 9.4 7.2 15.1.4 1.7 1.8 3.1 3.5 3.1h6.4c1.7 0 3.1-1.3 3.5-3.1 1.2-5.7 3.6-10.8 7.2-15.1 3.6-4.3 8.3-6.8 13-7.3 3-.3 5.7.2 7.8 1.6 3 2.1 4.8 5.4 5.1 9.9.4 5.5 0 12-.4 19.6-4.4 8.1-10.8 16.2-19.1 24.2-6.7 6.3-14.6 10.3-23.4 11.8-1.1.2-2.2.3-3.3.3zM25.7 19.1c-.8 0-1.6.1-2.4.3-3.4 1.1-5.1 4.2-5.1 8.8 0 5 1.5 10.9 4.3 17.5 1.4 3.4 3.2 6.5 5.2 9.1 2-2.6 3.8-5.7 5.2-9.1C35 39 36.5 33.1 36.5 28.1c0-4.6-1.7-7.7-5.1-8.8-.8-.2-1.6-.3-2.4-.3h-3.3zM74.3 19.1c-.8 0-1.6.1-2.4.3-3.4 1.1-5.1 4.2-5.1 8.8 0 5 1.5 10.9 4.3 17.5 1.4 3.4 3.2 6.5 5.2 9.1 2-2.6 3.8-5.7 5.2-9.1C85 39 86.5 33.1 86.5 28.1c0-4.6-1.7-7.7-5.1-8.8-.8-.2-1.6-.3-2.4-.3h-3.3z'%3E%3C/path%3E%3C/svg%3E" type="image/svg+xml">
-    
-    <script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
-    
+ 
     <style>
         /* Estilos base para la página */
         html, body {
@@ -56,40 +54,22 @@
     <div id="panzoom-container">
         <img id="panzoom-element" src="image_0.png" alt="Menú de Bebidas de la Baticueva">
     </div>
-
+    <script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script>
-        // Obtener elementos DOM
-        const panzoomContainer = document.getElementById('panzoom-container');
-        const panzoomElement = document.getElementById('panzoom-element');
-
-        // Inicializar Panzoom con configuraciones para móvil y escritorio
-        const instance = Panzoom(panzoomElement, {
-            maxScale: 4,          // Escala máxima (puedes ajustarla)
-            minScale: 1,          // Escala mínima (ajustar a pantalla)
-            contain: 'outside',   // Evita que la imagen se mueva fuera del área visible
-            startScale: 1,        // Escala inicial
-            panOnlyWhenZoomed: false, // Permitir pan incluso a escala 1:1
-            setTransform: (e) => { // Función para centrar la imagen al hacer pan/zoom
-                // Esta configuración personalizada asegura que el centrado sea suave
-                panzoomElement.style.transform = `translate(${e.x}px, ${e.y}px) scale(${e.scale})`;
-            }
+        // Seleccionamos la imagen por su ID
+        const elem = document.getElementById('panzoom-element');
+        
+        // Inicializamos Panzoom. Esto habilita el zoom táctil (pellizco) y el arrastre móvil automáticamente.
+        const panzoom = Panzoom(elem, {
+            maxScale: 4,     // Límite máximo de zoom (puedes subirlo si quieres que acerque más)
+            minScale: 1,     // Límite mínimo de zoom
+            contain: 'outside' // Evita que la imagen se pierda fuera de la pantalla al arrastrarla
         });
 
-        // Habilitar el zoom con la rueda del ratón (útil para pruebas en escritorio)
-        panzoomContainer.addEventListener('wheel', instance.zoomWithWheel);
-
-        // Habilitar el zoom con doble tap (común en móviles)
-        panzoomContainer.addEventListener('dblclick', (e) => {
-            instance.zoom(2, { animate: true }); // Duplicar el zoom con un doble tap
-        });
-
-        // Asegurar que la imagen se reajuste al cambiar la orientación del dispositivo
-        window.addEventListener('resize', () => {
-            instance.setOptions({
-                minScale: 1
-            });
-            instance.zoom(1, { animate: false }); // Resetear el zoom
-        });
+        // Seleccionamos el contenedor y le agregamos la función de la rueda del ratón (PC)
+        const container = document.getElementById('panzoom-container');
+        container.addEventListener('wheel', panzoom.zoomWithWheel);
     </script>
+
 </body>
 </html>
