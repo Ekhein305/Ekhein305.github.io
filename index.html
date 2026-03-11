@@ -26,17 +26,14 @@
             justify-content: center;
             align-items: center;
             touch-action: none;
-            cursor: grab;
+            -webkit-overflow-scrolling: none;
             user-select: none;
-        }
-
-        #viewport.grabbing {
-            cursor: grabbing;
+            -webkit-user-select: none;
         }
 
         #scene {
             position: relative;
-            transform-origin: center center;
+            transform-origin: 0 0;
             will-change: transform;
         }
 
@@ -46,9 +43,8 @@
             max-height: 100vh;
             object-fit: contain;
             user-select: none;
+            -webkit-user-select: none;
             -webkit-user-drag: none;
-            pointer-events: none;
-            image-rendering: -webkit-optimize-contrast;
         }
     </style>
 </head>
@@ -65,209 +61,168 @@
     const viewport = document.getElementById('viewport');
     const scene    = document.getElementById('scene');
 
-    // ── Estado ──────────────────────────────────────────────────────────────
     let scale   = 1;
-    let originX = 0;   // traslación en px
-    let originY = 0;
+    let panX    = 0;
+    let panY    = 0;
 
     const MIN_SCALE = 1;
     const MAX_SCALE = 12;
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
     function clamp(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
 
-    function applyTransform() {
-        scene.style.transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
-    }
-
-    /** Limita la traslación para que la imagen no salga de la pantalla */
-    function clampTranslation() {
-        const vw = viewport.clientWidth;
-        const vh = viewport.clientHeight;
-        const iw = scene.offsetWidth  * scale;
-        const ih = scene.offsetHeight * scale;
-
-        const maxX = Math.max(0, (iw - vw) / 2);
-        const maxY = Math.max(0, (ih - vh) / 2);
-
-        originX = clamp(originX, -maxX, maxX);
-        originY = clamp(originY, -maxY, maxY);
-    }
-
-    function resetView(animate) {
+    function applyTransform(animate) {
         if (animate) {
-            scene.style.transition = 'transform 0.35s ease';
-            setTimeout(() => { scene.style.transition = ''; }, 380);
+            scene.style.transition = 'transform 0.3s ease';
+            setTimeout(function() { scene.style.transition = ''; }, 320);
+        } else {
+            scene.style.transition = '';
         }
-        scale   = 1;
-        originX = 0;
-        originY = 0;
-        applyTransform();
+        scene.style.transform =
+            'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
     }
 
-    // ── Zoom centrado en un punto (px relativos al viewport) ─────────────────
+    function clampPan() {
+        var vw = viewport.clientWidth;
+        var vh = viewport.clientHeight;
+        var iw = scene.offsetWidth  * scale;
+        var ih = scene.offsetHeight * scale;
+        var maxX = Math.max(0, (iw - vw) / 2);
+        var maxY = Math.max(0, (ih - vh) / 2);
+        panX = clamp(panX, -maxX, maxX);
+        panY = clamp(panY, -maxY, maxY);
+    }
+
+    function resetView() {
+        scale = 1; panX = 0; panY = 0;
+        applyTransform(true);
+    }
+
     function zoomAt(cx, cy, newScale) {
         newScale = clamp(newScale, MIN_SCALE, MAX_SCALE);
-
-        // Convertir centro del gesto a coordenadas del scene antes del zoom
-        const ratio = newScale / scale;
-
-        // El punto cx,cy debe quedar fijo; ajustamos la traslación
-        // Fórmula: newOrigin = cx - ratio * (cx - originX)  … idem Y
-        originX = cx - ratio * (cx - originX);
-        originY = cy - ratio * (cy - originY);
-        scale   = newScale;
-
-        clampTranslation();
-        applyTransform();
+        var ratio = newScale / scale;
+        panX = cx - ratio * (cx - panX);
+        panY = cy - ratio * (cy - panY);
+        scale = newScale;
+        clampPan();
+        applyTransform(false);
     }
 
-    // ── Distancia entre dos toques ───────────────────────────────────────────
-    function dist(t1, t2) {
-        const dx = t1.clientX - t2.clientX;
-        const dy = t1.clientY - t2.clientY;
+    function getTouchDist(t1, t2) {
+        var dx = t1.clientX - t2.clientX;
+        var dy = t1.clientY - t2.clientY;
         return Math.sqrt(dx * dx + dy * dy);
     }
-
-    function midpoint(t1, t2) {
+    function getTouchMid(t1, t2) {
         return {
             x: (t1.clientX + t2.clientX) / 2,
-            y: (t1.clientY + t2.clientY) / 2,
+            y: (t1.clientY + t2.clientY) / 2
+        };
+    }
+    function toViewportCenter(clientX, clientY) {
+        var rect = viewport.getBoundingClientRect();
+        return {
+            x: clientX - rect.left - rect.width  / 2,
+            y: clientY - rect.top  - rect.height / 2
         };
     }
 
-    // ── Estado de gestos ─────────────────────────────────────────────────────
-    let lastDist    = null;
-    let lastMid     = null;
-    let lastPointer = null;   // para arrastre de 1 dedo
-    let isPinching  = false;
-    let tapTimer    = null;
-    let tapCount    = 0;
+    var lastDist   = 0;
+    var lastMid    = null;
+    var lastPan    = null;
+    var isPinching = false;
+    var tapCount   = 0;
+    var tapTimer   = null;
+    var tapPos     = null;
 
-    const activeTouches = new Map();  // pointerId → evento
+    viewport.addEventListener('touchstart',  onTouchStart,  { passive: false });
+    viewport.addEventListener('touchmove',   onTouchMove,   { passive: false });
+    viewport.addEventListener('touchend',    onTouchEnd,    { passive: false });
+    viewport.addEventListener('touchcancel', onTouchEnd,    { passive: false });
 
-    // ── Pointer Events (unificados mouse + touch) ────────────────────────────
-    viewport.addEventListener('pointerdown', onDown,   { passive: false });
-    viewport.addEventListener('pointermove', onMove,   { passive: false });
-    viewport.addEventListener('pointerup',   onUp,     { passive: false });
-    viewport.addEventListener('pointercancel', onUp,   { passive: false });
-
-    function onDown(e) {
+    function onTouchStart(e) {
         e.preventDefault();
-        viewport.setPointerCapture(e.pointerId);
-        activeTouches.set(e.pointerId, e);
-        viewport.classList.add('grabbing');
 
-        if (activeTouches.size === 2) {
-            // Iniciar pinch
+        if (e.touches.length === 2) {
             isPinching = true;
-            const [t1, t2] = [...activeTouches.values()];
-            lastDist = dist(t1, t2);
-            lastMid  = midpoint(t1, t2);
-            lastPointer = null;
-        } else if (activeTouches.size === 1) {
-            isPinching  = false;
-            lastPointer = { x: e.clientX, y: e.clientY };
+            lastDist   = getTouchDist(e.touches[0], e.touches[1]);
+            lastMid    = getTouchMid(e.touches[0], e.touches[1]);
+            lastPan    = null;
+        } else if (e.touches.length === 1) {
+            isPinching = false;
+            lastPan    = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            tapPos     = { x: e.touches[0].clientX, y: e.touches[0].clientY };
 
-            // Detectar doble toque
             tapCount++;
             if (tapCount === 1) {
-                tapTimer = setTimeout(() => { tapCount = 0; }, 300);
-            } else if (tapCount === 2) {
+                tapTimer = setTimeout(function() { tapCount = 0; }, 300);
+            } else if (tapCount >= 2) {
                 clearTimeout(tapTimer);
                 tapCount = 0;
-                if (scale > 1) {
-                    resetView(true);
-                } else {
-                    // Zoom x3 centrado donde tocó
-                    const rect = viewport.getBoundingClientRect();
-                    zoomAt(e.clientX - rect.left - rect.width  / 2,
-                           e.clientY - rect.top  - rect.height / 2,
-                           3);
-                }
+                var c = toViewportCenter(tapPos.x, tapPos.y);
+                if (scale > 1) { resetView(); } else { zoomAt(c.x, c.y, 3); }
             }
         }
     }
 
-    function onMove(e) {
+    function onTouchMove(e) {
         e.preventDefault();
-        if (!activeTouches.has(e.pointerId)) return;
-        activeTouches.set(e.pointerId, e);
 
-        if (activeTouches.size === 2) {
-            // ── Pinch-zoom ──
-            const [t1, t2] = [...activeTouches.values()];
-            const d   = dist(t1, t2);
-            const mid = midpoint(t1, t2);
+        if (e.touches.length === 2) {
+            var t1  = e.touches[0], t2 = e.touches[1];
+            var d   = getTouchDist(t1, t2);
+            var mid = getTouchMid(t1, t2);
+            var c   = toViewportCenter(mid.x, mid.y);
 
-            const rect = viewport.getBoundingClientRect();
-            const cx = mid.x - rect.left - rect.width  / 2;
-            const cy = mid.y - rect.top  - rect.height / 2;
-
-            if (lastDist !== null) {
-                const newScale = scale * (d / lastDist);
-                zoomAt(cx, cy, newScale);
-
-                // Arrastre simultáneo al pinch (paneo)
-                originX += mid.x - lastMid.x;
-                originY += mid.y - lastMid.y;
-                clampTranslation();
-                applyTransform();
+            if (lastDist > 0) {
+                zoomAt(c.x, c.y, scale * (d / lastDist));
+            }
+            if (lastMid) {
+                panX += mid.x - lastMid.x;
+                panY += mid.y - lastMid.y;
+                clampPan();
+                applyTransform(false);
             }
 
             lastDist = d;
             lastMid  = mid;
 
-        } else if (activeTouches.size === 1 && !isPinching && lastPointer) {
-            // ── Paneo de 1 dedo ──
-            const dx = e.clientX - lastPointer.x;
-            const dy = e.clientY - lastPointer.y;
-            originX += dx;
-            originY += dy;
-            clampTranslation();
-            applyTransform();
-            lastPointer = { x: e.clientX, y: e.clientY };
+        } else if (e.touches.length === 1 && !isPinching && lastPan) {
+            var dx = e.touches[0].clientX - lastPan.x;
+            var dy = e.touches[0].clientY - lastPan.y;
+            panX += dx;
+            panY += dy;
+            clampPan();
+            applyTransform(false);
+            lastPan = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         }
     }
 
-    function onUp(e) {
+    function onTouchEnd(e) {
         e.preventDefault();
-        activeTouches.delete(e.pointerId);
-        viewport.classList.remove('grabbing');
-
-        if (activeTouches.size < 2) {
-            lastDist    = null;
-            lastMid     = null;
-            isPinching  = false;
+        if (e.touches.length < 2) {
+            isPinching = false;
+            lastDist   = 0;
+            lastMid    = null;
         }
-        if (activeTouches.size === 0) {
-            lastPointer = null;
-            // Si el zoom quedó por debajo del mínimo, restaurar suavemente
-            if (scale < MIN_SCALE) resetView(true);
+        if (e.touches.length === 0) {
+            lastPan = null;
+            if (scale < MIN_SCALE) resetView();
         }
     }
 
-    // ── Rueda del ratón (escritorio) ──────────────────────────────────────────
-    viewport.addEventListener('wheel', function (e) {
+    viewport.addEventListener('wheel', function(e) {
         e.preventDefault();
-        const rect    = viewport.getBoundingClientRect();
-        const cx      = e.clientX - rect.left - rect.width  / 2;
-        const cy      = e.clientY - rect.top  - rect.height / 2;
-        const factor  = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-        zoomAt(cx, cy, scale * factor);
+        var c      = toViewportCenter(e.clientX, e.clientY);
+        var factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+        zoomAt(c.x, c.y, scale * factor);
     }, { passive: false });
 
-    // ── Doble clic ratón ──────────────────────────────────────────────────────
-    viewport.addEventListener('dblclick', function (e) {
-        if (scale > 1) {
-            resetView(true);
-        } else {
-            const rect = viewport.getBoundingClientRect();
-            zoomAt(e.clientX - rect.left - rect.width  / 2,
-                   e.clientY - rect.top  - rect.height / 2,
-                   3);
-        }
+    viewport.addEventListener('dblclick', function(e) {
+        var c = toViewportCenter(e.clientX, e.clientY);
+        if (scale > 1) { resetView(); } else { zoomAt(c.x, c.y, 3); }
     });
+
+    applyTransform(false);
 
 })();
 </script>
